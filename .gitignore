@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Environment variables (JANGAN push .env ke GitHub!)
+.env
+
+# Debug logs
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files (optional - sesuaikan kebutuhan)
+# src/test.js
