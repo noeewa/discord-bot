@@ -28,6 +28,81 @@ const commands = [
                 .setDescription('Number of messages to delete (default: 5)')
                 .setRequired(false)
         )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('clearyou')
+        .setDescription('Clear your messages')
+        .addIntegerOption(option =>
+            option.setName('count')
+                .setDescription('Number of your messages to delete (default: 5)')
+                .setRequired(false)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('createlist')
+        .setDescription('Create a new list with tasks')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('createtask')
+        .setDescription('Create a new task')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('showall')
+        .setDescription('Show all lists and tasks')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('deletelist')
+        .setDescription('Delete a list')
+        .addStringOption(option =>
+            option.setName('name')
+                .setDescription('List name to delete')
+                .setRequired(true)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('deletetask')
+        .setDescription('Delete a task')
+        .addStringOption(option =>
+            option.setName('name')
+                .setDescription('Task name to delete')
+                .setRequired(true)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('addchannel')
+        .setDescription('Tambah channel baru (hanya untuk moderator)')
+        .addStringOption(option =>
+            option.setName('name')
+                .setDescription('Nama channel yang akan dibuat')
+                .setRequired(true)
+        )
+        .addStringOption(option =>
+            option.setName('type')
+                .setDescription('Tipe channel (text/voice/category)')
+                .setRequired(false)
+                .addChoices(
+                    { name: 'Text', value: 'text' },
+                    { name: 'Voice', value: 'voice' },
+                    { name: 'Category', value: 'category' }
+                )
+        )
+        .addBooleanOption(option =>
+            option.setName('broadcast')
+                .setDescription('Apakah channel broadcast (hanya bisa baca, tidak bisa chat)')
+                .setRequired(false)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('deletechannel')
+        .setDescription('Hapus channel (hanya untuk role tertentu)')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('listchannel')
+        .setDescription('Lihat daftar channel di server (hanya untuk moderator)')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('setchannel')
+        .setDescription('Set channel bot yang tersimpan di database (hanya untuk moderator)')
         .toJSON()
     
 ]

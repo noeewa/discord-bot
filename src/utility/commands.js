@@ -1,5 +1,1 @@
-require('discord.js')
-
-export default commands_are = (interaction) => {
-    
-}
+module.exports = { commands_are }
