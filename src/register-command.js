@@ -72,23 +72,8 @@ const commands = [
         .setName('addchannel')
         .setDescription('Tambah channel baru (hanya untuk moderator)')
         .addStringOption(option =>
-            option.setName('name')
-                .setDescription('Nama channel yang akan dibuat')
-                .setRequired(true)
-        )
-        .addStringOption(option =>
-            option.setName('type')
-                .setDescription('Tipe channel (text/voice/category)')
-                .setRequired(false)
-                .addChoices(
-                    { name: 'Text', value: 'text' },
-                    { name: 'Voice', value: 'voice' },
-                    { name: 'Category', value: 'category' }
-                )
-        )
-        .addBooleanOption(option =>
-            option.setName('broadcast')
-                .setDescription('Apakah channel broadcast (hanya bisa baca, tidak bisa chat)')
+            option.setName('nama')
+                .setDescription('Nama channel yang ingin dibuat')
                 .setRequired(false)
         )
         .toJSON(),

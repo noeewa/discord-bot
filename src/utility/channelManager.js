@@ -26,9 +26,10 @@ function hasAllowedRole(interaction) {
  * @param {string} channelName - Nama channel yang akan dibuat
  * @param {string} channelType - Tipe channel (text, voice, category)
  * @param {boolean} isBroadcast - Apakah channel broadcast (read-only)
+ * @param {string} categoryId - ID category tempat channel akan dibuat
  * @returns {Promise<object>} - Hasil operasi channel
  */
-async function addChannel(interaction, channelName, channelType = 'text', isBroadcast = false) {
+async function addChannel(interaction, channelName, channelType = 'text', isBroadcast = false, categoryId = null) {
     // Cek permission
     if (!hasAllowedRole(interaction)) {
         return {
@@ -39,6 +40,12 @@ async function addChannel(interaction, channelName, channelType = 'text', isBroa
 
     const guild = interaction.guild
     
+    // Get category object if categoryId is provided
+    let category = null
+    if (categoryId) {
+        category = await guild.channels.fetch(categoryId)
+    }
+    
     try {
         let channel
         
@@ -47,6 +54,7 @@ async function addChannel(interaction, channelName, channelType = 'text', isBroa
                 channel = await guild.channels.create({
                     name: channelName,
                     type: ChannelType.GuildVoice,
+                    parent: category,
                     permissionOverwrites: [
                         {
                             id: guild.id,
@@ -70,6 +78,7 @@ async function addChannel(interaction, channelName, channelType = 'text', isBroa
                     channel = await guild.channels.create({
                         name: channelName,
                         type: ChannelType.GuildText,
+                        parent: category,
                         permissionOverwrites: [
                             {
                                 id: guild.id,
@@ -82,6 +91,7 @@ async function addChannel(interaction, channelName, channelType = 'text', isBroa
                     channel = await guild.channels.create({
                         name: channelName,
                         type: ChannelType.GuildText,
+                        parent: category,
                         permissionOverwrites: [
                             {
                                 id: guild.id,

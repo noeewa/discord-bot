@@ -136,6 +136,73 @@ client.on('interactionCreate', async (interaction) => {
             await handleCreateListTimeBtn(interaction, interactionData)
             return
         }
+        
+        // Handle addchannel type button - show channel name modal
+        if (interaction.customId.startsWith('addchannel_type_')) {
+            try {
+                const channelType = interaction.customId.replace('addchannel_type_', '')
+                
+                // Get stored category data
+                const storedData = interactionData.get(interaction.user.id)
+                if (!storedData || !storedData.categoryId) {
+                    await interaction.reply({ content: '❌ Sesi expired. Silakan ketik /addchannel lagi.', ephemeral: true })
+                    return
+                }
+                
+                // Store channel type
+                interactionData.set(interaction.user.id, { ...storedData, channelType })
+                
+                // Check if channel name was provided via command parameter (stored in interactionData)
+                const channelName = storedData?.channelName
+                
+                // If channel name was provided, create channel directly without showing modal
+                if (channelName) {
+                    const isBroadcast = channelType === 'broadcast'
+                    const finalChannelType = channelType === 'broadcast' ? 'text' : channelType
+                    
+                    // Create the channel
+                    const result = await addChannel(interaction, channelName, finalChannelType, isBroadcast, storedData.categoryId === 'none' ? null : storedData.categoryId)
+                    
+                    await interaction.reply({ content: result.message, ephemeral: true })
+                    
+                    // Clean up stored data
+                    interactionData.delete(interaction.user.id)
+                    
+                    console.log(`➕ Channel "${channelName}" created by ${interaction.user.username} in category ${storedData.categoryName}`)
+                    return
+                }
+                
+                // Show modal for channel name
+                const channelNameModal = new ModalBuilder()
+                    .setCustomId('addchannel_name_modal')
+                    .setTitle('Nama Channel')
+                    
+                const channelNameInput = new TextInputBuilder()
+                    .setCustomId('channel_name')
+                    .setLabel('Nama Channel')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Contoh: umum, voice-chat-1')
+                    .setRequired(true)
+                    
+                const channelNameRow = new ActionRowBuilder().addComponents(channelNameInput)
+                channelNameModal.addComponents(channelNameRow)
+                
+                await interaction.showModal(channelNameModal)
+            } catch (error) {
+                console.error('Error showing channel name modal:', error)
+                const errorMessage = error.message || ''
+                if (errorMessage.includes('Unknown interaction') || errorMessage.includes('already replied')) {
+                    // Interaction already handled or expired - ignore
+                    return
+                }
+                try {
+                    await interaction.reply({ content: '❌ Gagal membuka form. Silakan ketik /addchannel lagi.', ephemeral: true })
+                } catch (e) {
+                    // Can't reply - interaction expired
+                }
+            }
+            return
+        }
     }
     
     // Handle select menu interactions
@@ -231,6 +298,56 @@ client.on('interactionCreate', async (interaction) => {
             }
             return
         }
+        
+        // Handle addchannel category selection
+        if (interaction.customId === 'addchannel_category_select') {
+            try {
+                const categoryId = interaction.values[0]
+                const guild = interaction.guild
+                
+                // Get category name if not "none"
+                let categoryName = 'Tanpa Category'
+                let category = null
+                if (categoryId !== 'none') {
+                    category = await guild.channels.fetch(categoryId)
+                    if (category) {
+                        categoryName = category.name
+                    }
+                }
+                
+                // Store category selection in interactionData
+                interactionData.set(interaction.user.id, { categoryId, categoryName, category })
+                
+                // Create buttons for channel type selection
+                const textButton = new ButtonBuilder()
+                    .setCustomId('addchannel_type_text')
+                    .setLabel('📝 Text Channel')
+                    .setStyle(ButtonStyle.Primary)
+                
+                const voiceButton = new ButtonBuilder()
+                    .setCustomId('addchannel_type_voice')
+                    .setLabel('🔊 Voice Channel')
+                    .setStyle(ButtonStyle.Primary)
+                
+                const broadcastButton = new ButtonBuilder()
+                    .setCustomId('addchannel_type_broadcast')
+                    .setLabel('📢 Broadcast Channel')
+                    .setStyle(ButtonStyle.Success)
+                
+                const typeRow = new ActionRowBuilder().addComponents(textButton, voiceButton, broadcastButton)
+                
+                const embed = new EmbedBuilder()
+                    .setColor(0x0099ff)
+                    .setTitle('➕ Buat Channel Baru')
+                    .setDescription(`Category: **${categoryName}**\n\nPilih tipe channel yang ingin dibuat:`)
+                
+                await interaction.update({ embeds: [embed], components: [typeRow] })
+            } catch (error) {
+                console.error('Error handling category selection:', error)
+                await interaction.reply({ content: '❌ Gagal memproses pilihan. Silakan coba lagi.', ephemeral: true })
+            }
+            return
+        }
     }
     
     // Handle modal submissions
@@ -252,6 +369,42 @@ client.on('interactionCreate', async (interaction) => {
         
         if (interaction.customId === 'createlist_time_modal') {
             await handleCreateListTimeModal(interaction, interactionData)
+            return
+        }
+        
+        // Handle addchannel name modal
+        if (interaction.customId === 'addchannel_name_modal') {
+            try {
+                const storedData = interactionData.get(interaction.user.id)
+                
+                if (!storedData || !storedData.categoryId || !storedData.channelType) {
+                    await interaction.reply({ content: '❌ Sesi expired. Silakan ketik /addchannel lagi.', ephemeral: true })
+                    return
+                }
+                
+                // Check if channel name was provided via command parameter, otherwise get from modal
+                let channelName = storedData?.channelName
+                if (!channelName) {
+                    channelName = interaction.fields.getTextInputValue('channel_name')
+                }
+                
+                const { categoryId, channelType } = storedData
+                const isBroadcast = channelType === 'broadcast'
+                const finalChannelType = channelType === 'broadcast' ? 'text' : channelType
+                
+                // Create the channel
+                const result = await addChannel(interaction, channelName, finalChannelType, isBroadcast, categoryId === 'none' ? null : categoryId)
+                
+                await interaction.reply({ content: result.message, ephemeral: true })
+                
+                // Clean up stored data
+                interactionData.delete(interaction.user.id)
+                
+                console.log(`➕ Channel "${channelName}" created by ${interaction.user.username} in category ${storedData.categoryName}`)
+            } catch (error) {
+                console.error('Error creating channel:', error)
+                await interaction.reply({ content: '❌ Gagal membuat channel. Silakan coba lagi.', ephemeral: true })
+            }
             return
         }
     }
@@ -543,18 +696,79 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: '❌ Gagal membuka form. Silakan coba lagi.', ephemeral: true })
         }
     } else if (interaction.commandName === 'addchannel') {
-        // Handle /addchannel slash command - create a new channel
+        // Handle /addchannel slash command - show category selection first
         try {
-            const channelName = interaction.options.getString('name')
-            const channelType = interaction.options.getString('type') || 'text'
-            const isBroadcast = interaction.options.getBoolean('broadcast') || false
+            // First check moderator permission
+            const { hasAllowedRole } = require('./utility/channelManager.js')
             
-            const result = await addChannel(interaction, channelName, channelType, isBroadcast)
+            if (!hasAllowedRole(interaction)) {
+                await interaction.reply({ content: '❌ Anda tidak memiliki izin untuk menggunakan perintah ini. Hanya moderator yang boleh menggunakan fitur ini.', ephemeral: true })
+                return
+            }
             
-            await interaction.reply({ content: result.message, ephemeral: true })
+            // Get channel name if provided as parameter
+            const channelName = interaction.options.getString('nama')
+            
+            const guild = interaction.guild
+            const channels = await guild.channels.fetch()
+            
+            // Get all categories
+            const categories = channels.filter(ch => ch.type === ChannelType.GuildCategory)
+            
+            // Create options for category selection
+            const categoryOptions = []
+            
+            // Add "Tanpa Category" option
+            categoryOptions.push({
+                label: 'Tanpa Category',
+                value: 'none'
+            })
+            
+            // Add existing categories (limit to 24 due to Discord limit)
+            const categoryArray = Array.from(categories.values()).slice(0, 24)
+            for (const category of categoryArray) {
+                categoryOptions.push({
+                    label: category.name,
+                    value: category.id
+                })
+            }
+            
+            // Create select menu for category
+            const categorySelectMenu = new StringSelectMenuBuilder()
+                .setCustomId('addchannel_category_select')
+                .setPlaceholder('Pilih category untuk channel baru')
+                .setMinValues(1)
+                .setMaxValues(1)
+                .addOptions(categoryOptions)
+            
+            const categoryRow = new ActionRowBuilder().addComponents(categorySelectMenu)
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x0099ff)
+                .setTitle('➕ Buat Channel Baru')
+                .setDescription(channelName 
+                    ? `Nama channel: **${channelName}**\nPilih category terlebih dahulu untuk channel baru.` 
+                    : 'Pilih category terlebih dahulu untuk channel baru.')
+            
+            // Store channel name in interactionData for later use
+            if (channelName) {
+                const existingData = interactionData.get(interaction.user.id) || {}
+                interactionData.set(interaction.user.id, { ...existingData, channelName })
+            }
+            
+            await interaction.reply({ embeds: [embed], components: [categoryRow], ephemeral: true })
         } catch (error) {
-            console.error('Error adding channel:', error)
-            await interaction.reply({ content: '❌ Gagal membuat channel. Silakan coba lagi.', ephemeral: true })
+            console.error('Error showing addchannel menu:', error)
+            const errorMessage = error.message || ''
+            if (errorMessage.includes('Unknown interaction') || errorMessage.includes('already replied')) {
+                // Ignore - interaction already handled
+                return
+            }
+            try {
+                await interaction.reply({ content: '❌ Gagal menampilkan menu. Silakan coba lagi.', ephemeral: true })
+            } catch (e) {
+                console.log('Cannot reply to interaction:', e.message)
+            }
         }
     } else if (interaction.commandName === 'deletechannel') {
         // Handle /deletechannel slash command - show channel selection to delete
