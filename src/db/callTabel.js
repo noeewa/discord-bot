@@ -63,6 +63,21 @@ function getUsersByServerId(serverId) {
     return users
 }
 
+// Check if user exists in a specific server
+function getUserByUserIdAndServerId(userId, serverId) {
+    const db = openDB()
+    const user = db.prepare('SELECT * FROM user WHERE userId = ? AND serverId = ?').get(userId, serverId)
+    return user
+}
+
+// Check if bot exists in a specific server
+function getBotByServerId(serverId) {
+    const db = openDB()
+    // Bot is identified by userId starting with 'bot_'
+    const bot = db.prepare('SELECT * FROM user WHERE userId LIKE ? AND serverId = ?').get('bot_%', serverId)
+    return bot
+}
+
 function getListsByServerId(serverId) {
     const db = openDB()
     const lists = db.prepare('SELECT * FROM list WHERE serverId = ?').all(serverId)
@@ -111,7 +126,9 @@ module.exports = {
     getAllUsers,
     getUserById,
     getUserByUserId,
+    getUserByUserIdAndServerId,
     getUsersByServerId,
+    getBotByServerId,
     getListsByServerId,
     getTasksByServerId,
     getListTasksByListId,

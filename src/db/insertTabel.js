@@ -47,6 +47,17 @@ function insertUser(namaUser, userId, serverId) {
     return result.lastInsertRowid
 }
 
+// Bot functions - store bot as user with bot_ prefix
+function insertBot(namaBot, botId, serverId) {
+    const db = openDB()
+    // Prefix bot userId with 'bot_' to identify it
+    const result = db.prepare(
+        `INSERT INTO user (namaUser, userId, serverId) VALUES (?, ?, ?)`
+    ).run([namaBot, 'bot_' + botId, serverId])
+    console.log('Bot inserted successfully')
+    return result.lastInsertRowid
+}
+
 function insertMultipleUsers(users, serverId) {
     const db = openDB()
     const stmt = db.prepare(
@@ -96,6 +107,7 @@ function insertTask(namaTask, activeTime, serverId, activeDay = null) {
 module.exports = { 
     insertServer, 
     insertUser, 
+    insertBot,
     insertMultipleUsers,
     insertList,
     insertListTask,

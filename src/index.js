@@ -4,7 +4,7 @@ const { groqSearch, groqRequest, getLastMessages, groqRequest_chat } = require('
 const { registerCommandsToGuild } = require('./register-command.js')
 const { createAllTables } = require('./db/createTabel.js')
 const { insertServer, insertUser, insertMultipleUsers, insertList, insertListTask, insertTask, updateServerChannel, updateServerBroadcastChannel, updateServerMusicChannel } = require('./db/insertTabel.js')
-const { getServerByServerId, getListsByServerId, getTasksByServerId, getListTasksByListId, getUsersByServerId, getAllServers } = require('./db/callTabel.js')
+const { getServerByServerId, getListsByServerId, getTasksByServerId, getListTasksByListId, getUsersByServerId, getAllServers, getUserByUserIdAndServerId } = require('./db/callTabel.js')
 const { deleteList, deleteTask } = require('./db/unsertTabel.js')
 const { createBroadcastChannel, sendBroadcastMessage } = require('./utility/broadcast.js')
 const { addChannel, deleteChannel, listChannels } = require('./utility/channelManager.js')
@@ -49,6 +49,36 @@ client.on('ready', async (c) => {
     
     // Start live clock scheduler
     scheduleLiveClock(client)
+});
+
+// Handle new member joining - auto-add user to database if server is registered
+client.on('guildMemberAdd', async (member) => {
+    // Skip if member is a bot
+    if (member.user.bot) {
+        return
+    }
+    
+    const guildId = member.guild.id
+    
+    // Check if server is registered
+    const server = await getServerByServerId(guildId)
+    
+    if (!server) {
+        // Server not registered, skip
+        return
+    }
+    
+    // Check if user already exists in database
+    const existingUser = getUserByUserIdAndServerId(member.user.id, server.id)
+    
+    if (existingUser) {
+        console.log(`⏭️ User already in database: ${member.user.username} - skipping auto-join`)
+        return
+    }
+    
+    // Add user to database
+    await insertUser(member.user.username, member.user.id, server.id)
+    console.log(`➕ User auto-added to database: ${member.user.username} (ID: ${member.user.id}) in server: ${server.namaServer}`)
 });
 
 // Handle incoming messages
