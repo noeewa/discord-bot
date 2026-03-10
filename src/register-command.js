@@ -88,8 +88,12 @@ const commands = [
     new SlashCommandBuilder()
         .setName('setchannel')
         .setDescription('Set channel bot yang tersimpan di database (hanya untuk moderator)')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('userstats')
+        .setDescription('Tampilkan jumlah user terdaftar')
         .toJSON()
-    
+
 ]
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN)

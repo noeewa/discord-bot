@@ -1,11 +1,14 @@
-const sqlite3 = require('sqlite3')
-const { open } = require('sqlite')
+const Database = require('better-sqlite3')
 
-async function openDB() {
-    return open({
-        filename: './database.db',
-        driver: sqlite3.Database
-    })
+function openDB() {
+    try {
+        const db = new Database('./database.db')
+        db.pragma('journal_mode = WAL')
+        return db
+    } catch (error) {
+        console.error('Error opening database:', error)
+        throw error
+    }
 }
 
 module.exports = { openDB }

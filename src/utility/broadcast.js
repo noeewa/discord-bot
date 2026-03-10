@@ -1,4 +1,5 @@
 const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js')
+const { getUsersByServerId, getServerByServerId } = require('../db/callTabel.js')
 
 /**
  * Send or edit a broadcast message in the channel
@@ -106,4 +107,39 @@ async function createBroadcastChannel(guild, channelName = '📢broadcast', pare
     }
 }
 
-module.exports = { createBroadcastChannel, sendBroadcastMessage }
+/**
+ * Broadcast the number of registered users in the server
+ * @param {TextChannel} channel - The Discord text channel
+ * @param {string} serverId - The Discord server ID
+ * @returns {Promise<Message>} - The sent message
+ */
+async function broadcastUserCount(channel, serverId) {
+    try {
+        // Get server from database
+        const server = getServerByServerId(serverId)
+        if (!server) {
+            return await channel.send('❌ Server belum terdaftar. Silakan gunakan /setchannel terlebih dahulu.')
+        }
+        
+        // Get registered users count
+        const users = getUsersByServerId(server.id)
+        const userCount = users.length
+        
+        // Create embed message
+        const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('📊 Statistik User Terdaftar')
+            .setDescription(`Jumlah user yang terdaftar di database:`)
+            .addFields(
+                { name: 'Total Terdaftar', value: userCount.toString(), inline: true }
+            )
+            .setTimestamp()
+        
+        return await sendBroadcastMessage(channel, embed)
+    } catch (error) {
+        console.error('Error broadcasting user count:', error)
+        throw error
+    }
+}
+
+module.exports = { createBroadcastChannel, sendBroadcastMessage, broadcastUserCount }

@@ -1,9 +1,10 @@
 require('dotenv').config()
+require('./keep_alive.js') // Uptime worker
 const { groqSearch, groqRequest, getLastMessages, groqRequest_chat } = require('./utility/groq.js')
 const { registerCommandsToGuild } = require('./register-command.js')
 const { createAllTables } = require('./db/createTabel.js')
 const { insertServer, insertUser, insertMultipleUsers, insertList, insertListTask, insertTask, updateServerChannel, updateServerBroadcastChannel } = require('./db/insertTabel.js')
-const { getServerByServerId, getListsByServerId, getTasksByServerId, getListTasksByListId } = require('./db/callTabel.js')
+const { getServerByServerId, getListsByServerId, getTasksByServerId, getListTasksByListId, getUsersByServerId } = require('./db/callTabel.js')
 const { deleteList, deleteTask } = require('./db/unsertTabel.js')
 const { createBroadcastChannel, sendBroadcastMessage } = require('./utility/broadcast.js')
 const { addChannel, deleteChannel, listChannels } = require('./utility/channelManager.js')
@@ -278,18 +279,29 @@ client.on('interactionCreate', async (interaction) => {
                 const timeString = getIndonesiaTime()
                 const { hour, dayName } = getIndonesiaDayHour()
                 
+                // Get registered users count from database
+                const users = getUsersByServerId(server.id)
+                const userCount = users.length
+                
+                // Get bot count from Discord server
+                const botCount = guild.members.cache.filter(m => m.user.bot).size
+                
                 const embed = new EmbedBuilder()
                     .setColor(0x0099ff)
                     .setTitle('=== BROADCAST CHANNEL ===')
                     .setDescription(`Channel ini telah diset sebagai channel broadcast.`)
                     .addFields(
-                        { name: 'Jam', value: `${dayName}, ${timeString}`, inline: true },
-                        { name: 'Status', value: '✅ Aktif', inline: true }
+                        { name: 'Jam', value: `${dayName}, ${timeString}`, inline: false },
+                        { name: 'User Terdaftar', value: userCount.toString(), inline: false },
+                        { name: 'Bot Terdaftar', value: botCount.toString(), inline: false },
+                        { name: 'Status', value: '✅ Aktif', inline: false }
                     )
                     .setFooter({ text: `Server: ${guild.name}` })
                     .setTimestamp()
                 
-                await sendBroadcastMessage(channel, embed)
+                await sendBroadcastMessage(channel, embed).catch(err => {
+                    console.error('Error sending broadcast message:', err.message)
+                })
                 
                 await interaction.reply({ content: `✅ Channel broadcast telah diset ke "#${channel.name}"!\n\n📝 Channel ini akan:\n- Menampilkan pesan broadcast dari bot\n- Menghapus pesan dari user (bukan bot)\n- Mengedit pesan bot yang sudah ada`, ephemeral: true })
             } catch (error) {
@@ -902,6 +914,34 @@ client.on('interactionCreate', async (interaction) => {
         } catch (error) {
             console.error('Error showing setchannel menu:', error)
             await interaction.reply({ content: '❌ Gagal menampilkan menu. Silakan coba lagi.', ephemeral: true })
+        }
+    } else if (interaction.commandName === 'userstats') {
+        // Handle /userstats slash command - show registered user count
+        try {
+            const guildId = interaction.guildId
+            const server = getServerByServerId(guildId)
+            
+            if (!server) {
+                await interaction.reply({ content: '❌ Server belum terdaftar.', ephemeral: true })
+                return
+            }
+            
+            const users = getUsersByServerId(server.id)
+            const userCount = users.length
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x00ff00)
+                .setTitle('📊 Statistik User Terdaftar')
+                .setDescription(`Jumlah user yang terdaftar di database:`)
+                .addFields(
+                    { name: 'Total Terdaftar', value: userCount.toString(), inline: true }
+                )
+                .setTimestamp()
+            
+            await interaction.reply({ embeds: [embed], ephemeral: true })
+        } catch (error) {
+            console.error('Error showing userstats:', error)
+            await interaction.reply({ content: '❌ Gagal menampilkan statistik user.', ephemeral: true })
         }
     }
     

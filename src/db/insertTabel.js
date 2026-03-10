@@ -1,92 +1,87 @@
 const { openDB } = require('./initSq.js')
 
 // Server functions
-async function insertServer(namaServer, serverId, channelId = null) {
-    const db = await openDB()
-    const result = await db.run(
-        `INSERT INTO server (namaServer, serverId, channelId) VALUES (?, ?, ?)`,
-        [namaServer, serverId, channelId]
-    )
+function insertServer(namaServer, serverId, channelId = null) {
+    const db = openDB()
+    const result = db.prepare(
+        `INSERT INTO server (namaServer, serverId, channelId) VALUES (?, ?, ?)`
+    ).run([namaServer, serverId, channelId])
     console.log('Server inserted successfully')
-    return result.lastID
+    return result.lastInsertRowid
 }
 
 // Update server channel
-async function updateServerChannel(serverId, channelId) {
-    const db = await openDB()
-    await db.run(
-        `UPDATE server SET channelId = ? WHERE serverId = ?`,
-        [channelId, serverId]
-    )
+function updateServerChannel(serverId, channelId) {
+    const db = openDB()
+    db.prepare(
+        `UPDATE server SET channelId = ? WHERE serverId = ?`
+    ).run([channelId, serverId])
     console.log('Server channel updated successfully')
 }
 
 // Update server broadcast channel
-async function updateServerBroadcastChannel(serverId, broadcastChannelId) {
-    const db = await openDB()
-    await db.run(
-        `UPDATE server SET broadcastChannelId = ? WHERE serverId = ?`,
-        [broadcastChannelId, serverId]
-    )
+function updateServerBroadcastChannel(serverId, broadcastChannelId) {
+    const db = openDB()
+    db.prepare(
+        `UPDATE server SET broadcastChannelId = ? WHERE serverId = ?`
+    ).run([broadcastChannelId, serverId])
     console.log('Server broadcast channel updated successfully')
 }
 
 // User functions
-async function insertUser(namaUser, userId, serverId) {
-    const db = await openDB()
-    const result = await db.run(
-        `INSERT INTO user (namaUser, userId, serverId) VALUES (?, ?, ?)`,
-        [namaUser, userId, serverId]
-    )
+function insertUser(namaUser, userId, serverId) {
+    const db = openDB()
+    const result = db.prepare(
+        `INSERT INTO user (namaUser, userId, serverId) VALUES (?, ?, ?)`
+    ).run([namaUser, userId, serverId])
     console.log('User inserted successfully')
-    return result.lastID
+    return result.lastInsertRowid
 }
 
-async function insertMultipleUsers(users, serverId) {
-    const db = await openDB()
-    const stmt = await db.prepare(
+function insertMultipleUsers(users, serverId) {
+    const db = openDB()
+    const stmt = db.prepare(
         `INSERT INTO user (namaUser, userId, serverId) VALUES (?, ?, ?)`
     )
     
-    for (const user of users) {
-        await stmt.run([user.namaUser, user.userId, serverId])
-    }
+    const insertMany = db.transaction((users) => {
+        for (const user of users) {
+            stmt.run([user.namaUser, user.userId, serverId])
+        }
+    })
     
-    await stmt.finalize()
+    insertMany(users)
     console.log(`${users.length} users inserted successfully`)
 }
 
 // List functions
-async function insertList(namaList, activeTime, serverId) {
-    const db = await openDB()
-    const result = await db.run(
-        `INSERT INTO list (namaList, activeTime, serverId) VALUES (?, ?, ?)`,
-        [namaList, activeTime, serverId]
-    )
+function insertList(namaList, activeTime, serverId) {
+    const db = openDB()
+    const result = db.prepare(
+        `INSERT INTO list (namaList, activeTime, serverId) VALUES (?, ?, ?)`
+    ).run([namaList, activeTime, serverId])
     console.log('List inserted successfully')
-    return result.lastID
+    return result.lastInsertRowid
 }
 
 // ListTask functions
-async function insertListTask(namaTask, target, listId, activeDay = null) {
-    const db = await openDB()
-    const result = await db.run(
-        `INSERT INTO list_task (namaTask, target, activeDay, listId) VALUES (?, ?, ?, ?)`,
-        [namaTask, target, activeDay, listId]
-    )
+function insertListTask(namaTask, target, listId, activeDay = null) {
+    const db = openDB()
+    const result = db.prepare(
+        `INSERT INTO list_task (namaTask, target, activeDay, listId) VALUES (?, ?, ?, ?)`
+    ).run([namaTask, target, activeDay, listId])
     console.log('ListTask inserted successfully')
-    return result.lastID
+    return result.lastInsertRowid
 }
 
 // Task functions (daily reminder)
-async function insertTask(namaTask, activeTime, serverId, activeDay = null) {
-    const db = await openDB()
-    const result = await db.run(
-        `INSERT INTO task (namaTask, activeTime, activeDay, serverId) VALUES (?, ?, ?, ?)`,
-        [namaTask, activeTime, activeDay, serverId]
-    )
+function insertTask(namaTask, activeTime, serverId, activeDay = null) {
+    const db = openDB()
+    const result = db.prepare(
+        `INSERT INTO task (namaTask, activeTime, activeDay, serverId) VALUES (?, ?, ?, ?)`
+    ).run([namaTask, activeTime, activeDay, serverId])
     console.log('Task inserted successfully')
-    return result.lastID
+    return result.lastInsertRowid
 }
 
 module.exports = { 
