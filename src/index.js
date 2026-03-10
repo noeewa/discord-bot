@@ -3,8 +3,8 @@ require('./keep_alive.js') // Uptime worker
 const { groqSearch, groqRequest, getLastMessages, groqRequest_chat } = require('./utility/groq.js')
 const { registerCommandsToGuild } = require('./register-command.js')
 const { createAllTables } = require('./db/createTabel.js')
-const { insertServer, insertUser, insertMultipleUsers, insertList, insertListTask, insertTask, updateServerChannel, updateServerBroadcastChannel } = require('./db/insertTabel.js')
-const { getServerByServerId, getListsByServerId, getTasksByServerId, getListTasksByListId, getUsersByServerId } = require('./db/callTabel.js')
+const { insertServer, insertUser, insertMultipleUsers, insertList, insertListTask, insertTask, updateServerChannel, updateServerBroadcastChannel, updateServerMusicChannel } = require('./db/insertTabel.js')
+const { getServerByServerId, getListsByServerId, getTasksByServerId, getListTasksByListId, getUsersByServerId, getAllServers } = require('./db/callTabel.js')
 const { deleteList, deleteTask } = require('./db/unsertTabel.js')
 const { createBroadcastChannel, sendBroadcastMessage } = require('./utility/broadcast.js')
 const { addChannel, deleteChannel, listChannels } = require('./utility/channelManager.js')
@@ -36,14 +36,42 @@ client.on('ready', async (c) => {
     console.log(`✅ ${c.user.username} is online!`)
     await createAllTables() //database
     
+    // Register commands to all existing servers
+    const allServers = getAllServers()
+    for (const server of allServers) {
+        try {
+            await registerCommandsToGuild(server.serverId)
+            console.log(`✅ Commands registered to server: ${server.serverId}`)
+        } catch (error) {
+            console.error(`❌ Failed to register commands to server ${server.serverId}:`, error.message)
+        }
+    }
+    
     // Start live clock scheduler
     scheduleLiveClock(client)
 });
 
 // Handle incoming messages
 client.on('messageCreate', async (message) => {
-    // Ignore bot messages
-    if (message.author.bot) return
+    // Ignore bot messages (except in music channel where we delete them)
+    if (message.author.bot) {
+        // Check if this is in a music channel - delete bot messages there
+        const guildId = message.guildId
+        const server = await getServerByServerId(guildId)
+        
+        if (server && server.musicChannelId && message.channelId === server.musicChannelId) {
+            // Delete bot message in music channel after 1 second
+            setTimeout(async () => {
+                try {
+                    await message.delete()
+                    console.log(`🗑️ Deleted bot message in music channel: "${message.content}"`)
+                } catch (e) {
+                    // Message may have been deleted
+                }
+            }, 1000)
+        }
+        return
+    }
     
     console.log(`📩 Message from ${message.author.username}: ${message.content}`)
     
@@ -58,6 +86,40 @@ client.on('messageCreate', async (message) => {
             console.log(`🗑️ Deleted user message in broadcast channel: "${message.content}"`)
         } catch (error) {
             console.error('Error deleting message in broadcast channel:', error)
+        }
+        return
+    }
+    
+    // Check if message is in a music channel - only allow links
+    if (server && server.musicChannelId && message.channelId === server.musicChannelId) {
+        // Check if message contains a URL/link
+        const urlRegex = /(https?:\/\/[^\s]+)/g
+        const hasLink = urlRegex.test(message.content)
+        
+        // Delete message if it doesn't contain a link
+        if (!hasLink) {
+            try {
+                // Get the broadcast channel to send warning
+                const guild = message.guild
+                const broadcastChannel = server.broadcastChannelId ? await guild.channels.fetch(server.broadcastChannelId) : null
+                
+                // Send warning to broadcast channel with user tag
+                if (broadcastChannel) {
+                    await broadcastChannel.send(`${message.author}, ⚠️ chanel khusus link!!`)
+                }
+                
+                // Delete original message after 1 second delay
+                setTimeout(async () => {
+                    try {
+                        await message.delete()
+                        console.log(`🗑️ Deleted non-link message in music channel: "${message.content}"`)
+                    } catch (delError) {
+                        // Message may have already been deleted
+                    }
+                }, 1000)
+            } catch (error) {
+                console.error('Error handling music channel message:', error)
+            }
         }
         return
     }
@@ -238,6 +300,8 @@ client.on('interactionCreate', async (interaction) => {
         // Handle setchannel selection
         if (interaction.customId === 'setchannel_select') {
             try {
+                await interaction.deferReply({ ephemeral: true })
+                
                 const channelId = interaction.values[0]
                 const guild = interaction.guild
                 
@@ -303,10 +367,46 @@ client.on('interactionCreate', async (interaction) => {
                     console.error('Error sending broadcast message:', err.message)
                 })
                 
-                await interaction.reply({ content: `✅ Channel broadcast telah diset ke "#${channel.name}"!\n\n📝 Channel ini akan:\n- Menampilkan pesan broadcast dari bot\n- Menghapus pesan dari user (bukan bot)\n- Mengedit pesan bot yang sudah ada`, ephemeral: true })
+                await interaction.editReply({ content: `✅ Channel broadcast telah diset ke "#${channel.name}"!\n\n📝 Channel ini akan:\n- Menampilkan pesan broadcast dari bot\n- Menghapus pesan dari user (bukan bot)\n- Mengedit pesan bot yang sudah ada` })
             } catch (error) {
                 console.error('Error setting channel from select:', error)
-                await interaction.reply({ content: '❌ Gagal menyimpan channel. Silakan coba lagi.', ephemeral: true })
+                await interaction.editReply({ content: '❌ Gagal menyimpan channel. Silakan coba lagi.' })
+            }
+            return
+        }
+        
+        // Handle setchanelmusic selection
+        if (interaction.customId === 'setchanelmusic_select') {
+            try {
+                await interaction.deferReply({ ephemeral: true })
+                
+                const channelId = interaction.values[0]
+                const guild = interaction.guild
+                
+                // Fetch the channel
+                const channel = await guild.channels.fetch(channelId)
+                
+                if (!channel) {
+                    await interaction.editReply({ content: '❌ Channel tidak ditemukan.' })
+                    return
+                }
+                
+                // Get server info
+                const guildId = interaction.guildId
+                const server = await getServerByServerId(guildId)
+                
+                if (!server) {
+                    await interaction.editReply({ content: '❌ Server belum terdaftar.' })
+                    return
+                }
+                
+                // Update the music channel in database
+                await updateServerMusicChannel(server.id, channelId)
+                
+                await interaction.editReply({ content: `✅ Channel music telah diset ke "#${channel.name}"!\n\n📝 Channel ini akan:\n- Hanya menerima link (URL)\n- Menghapus command bot\n- Menghapus pesan biasa yang bukan link` })
+            } catch (error) {
+                console.error('Error setting music channel from select:', error)
+                await interaction.editReply({ content: '❌ Gagal menyimpan channel. Silakan coba lagi.' })
             }
             return
         }
@@ -796,9 +896,9 @@ client.on('interactionCreate', async (interaction) => {
             const guild = interaction.guild
             const channels = await guild.channels.fetch()
             
-            // Filter only text and voice channels (not categories)
+            // Filter only text, voice and announcement channels (not categories)
             const selectableChannels = channels.filter(ch => 
-                ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildVoice
+                ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildVoice || ch.type === ChannelType.GuildAnnouncement
             )
             
             if (selectableChannels.size === 0) {
@@ -873,8 +973,8 @@ client.on('interactionCreate', async (interaction) => {
             const guild = interaction.guild
             const channels = await guild.channels.fetch()
             
-            // Filter only text channels
-            const textChannels = channels.filter(ch => ch.type === ChannelType.GuildText)
+            // Filter only text channels and announcement channels
+            const textChannels = channels.filter(ch => ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement)
             
             if (textChannels.size === 0) {
                 await interaction.reply({ content: '❌ Tidak ada text channel di server ini.', ephemeral: true })
@@ -942,6 +1042,71 @@ client.on('interactionCreate', async (interaction) => {
         } catch (error) {
             console.error('Error showing userstats:', error)
             await interaction.reply({ content: '❌ Gagal menampilkan statistik user.', ephemeral: true })
+        }
+    } else if (interaction.commandName === 'setchanelmusic') {
+        // Handle /setchanelmusic slash command - set music channel that only accepts links
+        try {
+            // First check moderator permission
+            const { hasAllowedRole } = require('./utility/channelManager.js')
+            
+            if (!hasAllowedRole(interaction)) {
+                await interaction.reply({ content: '❌ Anda tidak memiliki izin untuk menggunakan perintah ini. Hanya moderator yang boleh menggunakan fitur ini.', ephemeral: true })
+                return
+            }
+            
+            // Check if server is registered
+            const guildId = interaction.guildId
+            const server = await getServerByServerId(guildId)
+            
+            if (!server) {
+                await interaction.reply({ content: '❌ Server belum terdaftar. Ketik "@bot start-gdrive" untuk mendaftarkan server.', ephemeral: true })
+                return
+            }
+            
+            const guild = interaction.guild
+            const channels = await guild.channels.fetch()
+            
+            // Filter only text channels and announcement channels
+            const textChannels = channels.filter(ch => ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement)
+            
+            if (textChannels.size === 0) {
+                await interaction.reply({ content: '❌ Tidak ada text channel di server ini.', ephemeral: true })
+                return
+            }
+            
+            // Discord has a limit of 25 options per select menu
+            const maxOptions = 25
+            const channelList = textChannels.first(maxOptions)
+            
+            // Create channel options
+            const channelOptions = channelList.map(ch => ({
+                label: `# ${ch.name}`,
+                value: ch.id
+            }))
+            
+            const channelSelectMenu = new StringSelectMenuBuilder()
+                .setCustomId('setchanelmusic_select')
+                .setPlaceholder('Pilih channel music')
+                .setMinValues(1)
+                .setMaxValues(1)
+                .addOptions(channelOptions)
+            
+            const row = new ActionRowBuilder().addComponents(channelSelectMenu)
+            
+            let description = 'Pilih channel yang akan digunakan sebagai channel music.\nHanya link yang diizinkan di channel ini, command dan pesan lain akan dihapus secara otomatis.'
+            if (textChannels.size > maxOptions) {
+                description += `\n\n⚠️ Hanya menampilkan ${maxOptions} channel pertama. Total: ${textChannels.size}`
+            }
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x0099ff)
+                .setTitle('🎵 Set Channel Music')
+                .setDescription(description)
+            
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true })
+        } catch (error) {
+            console.error('Error showing setchanelmusic menu:', error)
+            await interaction.reply({ content: '❌ Gagal menampilkan menu. Silakan coba lagi.', ephemeral: true })
         }
     }
     

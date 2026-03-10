@@ -8,7 +8,8 @@ function createServerTable() {
             namaServer TEXT,
             serverId TEXT,
             channelId TEXT,
-            broadcastChannelId TEXT
+            broadcastChannelId TEXT,
+            musicChannelId TEXT
         )
     `)
     
@@ -26,6 +27,13 @@ function createServerTable() {
         if (!hasBroadcastChannelId) {
             db.exec(`ALTER TABLE server ADD COLUMN broadcastChannelId TEXT`)
             console.log('Migrated: Added broadcastChannelId column to server table')
+        }
+        
+        // Migration: Add musicChannelId column if it doesn't exist
+        const hasMusicChannelId = tableInfo.some(col => col.name === 'musicChannelId')
+        if (!hasMusicChannelId) {
+            db.exec(`ALTER TABLE server ADD COLUMN musicChannelId TEXT`)
+            console.log('Migrated: Added musicChannelId column to server table')
         }
     } catch (e) {
         console.log('Migration check skipped:', e.message)

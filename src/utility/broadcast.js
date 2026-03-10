@@ -2,36 +2,31 @@ const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js')
 const { getUsersByServerId, getServerByServerId } = require('../db/callTabel.js')
 
 /**
- * Send or edit a broadcast message in the channel
- * - If there's an existing bot message, edit it
- * - If there's no bot message, send a new one
+ * Send a broadcast message in the channel
+ * - Deletes all messages in the channel first
+ * - Then sends the new broadcast message
  * @param {TextChannel} channel - The Discord text channel
  * @param {string|EmbedBuilder} content - Message content or embed
- * @returns {Promise<Message>} - The sent or edited message
+ * @returns {Promise<Message>} - The sent message
  */
 async function sendBroadcastMessage(channel, content) {
     try {
-        // Fetch last 10 messages from the channel
-        const messages = await channel.messages.fetch({ limit: 10 })
-        
-        // Find the last bot message
-        const botMessage = messages.find(msg => msg.author.bot && msg.author.id === channel.client.user.id)
-        
-        if (botMessage) {
-            // Edit existing bot message
-            if (content instanceof EmbedBuilder) {
-                await botMessage.edit({ embeds: [content] })
-            } else {
-                await botMessage.edit({ content: content })
+        // Fetch and delete all messages in the channel
+        try {
+            const messages = await channel.messages.fetch()
+            if (messages.size > 0) {
+                await channel.bulkDelete(messages, true)
+                console.log(`🗑️ Deleted ${messages.size} messages in broadcast channel`)
             }
-            return botMessage
+        } catch (delError) {
+            console.log('Note: Could not bulk delete messages:', delError.message)
+        }
+        
+        // Send new message
+        if (content instanceof EmbedBuilder) {
+            return await channel.send({ embeds: [content] })
         } else {
-            // Send new message
-            if (content instanceof EmbedBuilder) {
-                return await channel.send({ embeds: [content] })
-            } else {
-                return await channel.send(content)
-            }
+            return await channel.send(content)
         }
     } catch (error) {
         console.error('Error sending broadcast message:', error)

@@ -90,6 +90,10 @@ const commands = [
         .setDescription('Set channel bot yang tersimpan di database (hanya untuk moderator)')
         .toJSON(),
     new SlashCommandBuilder()
+        .setName('setchanelmusic')
+        .setDescription('Set channel music yang hanya menerima link (hanya untuk moderator)')
+        .toJSON(),
+    new SlashCommandBuilder()
         .setName('userstats')
         .setDescription('Tampilkan jumlah user terdaftar')
         .toJSON()

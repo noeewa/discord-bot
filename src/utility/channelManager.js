@@ -72,12 +72,15 @@ async function addChannel(interaction, channelName, channelType = 'text', isBroa
                 break
                 
             case 'text':
+            case 'announcement':
             default:
                 if (isBroadcast) {
                     // Broadcast channel - read only (tidak bisa chat)
+                    // Use announcement type if specified, otherwise text
+                    const channelType = channelType === 'announcement' ? ChannelType.GuildAnnouncement : ChannelType.GuildText
                     channel = await guild.channels.create({
                         name: channelName,
-                        type: ChannelType.GuildText,
+                        type: channelType,
                         parent: category,
                         permissionOverwrites: [
                             {
@@ -88,9 +91,10 @@ async function addChannel(interaction, channelName, channelType = 'text', isBroa
                         ],
                     })
                 } else {
+                    const channelType = channelType === 'announcement' ? ChannelType.GuildAnnouncement : ChannelType.GuildText
                     channel = await guild.channels.create({
                         name: channelName,
-                        type: ChannelType.GuildText,
+                        type: channelType,
                         parent: category,
                         permissionOverwrites: [
                             {

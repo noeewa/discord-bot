@@ -1,6 +1,6 @@
 const cron = require('node-cron')
 const { EmbedBuilder } = require('discord.js')
-const { getAllServers, getTasksByServerId, getListTasksByListId, getListsByServerId, getAllListTasks, getAllTasks, getAllLists } = require('./db/callTabel.js')
+const { getAllServers, getTasksByServerId, getListTasksByListId, getListsByServerId, getAllListTasks, getAllTasks, getAllLists, getUsersByServerId } = require('./db/callTabel.js')
 const { sendBroadcastMessage } = require('./utility/broadcast.js')
 const { resetAllTaskStatuses } = require('./db/unsertTabel.js')
 
@@ -472,14 +472,22 @@ async function sendHourlyUpdate(client) {
                 // Format time
                 const timeString = getIndonesiaTime()
                 
+                // Get registered users count
+                const users = await getUsersByServerId(server.id)
+                const userCount = users.length
+                
+                // Get bot count from Discord
+                const botCount = guild.members.cache.filter(m => m.user.bot).size
+                
                 // Create embed
                 const embed = new EmbedBuilder()
                     .setColor(0x0099ff)
                     .setTitle('=== JAM BROADCAST ===')
                     .setDescription(`Waktu saat ini di Indonesia:`)
                     .addFields(
-                        { name: 'Hari', value: currentDayName, inline: true },
-                        { name: 'Jam', value: `${currentHour}:00`, inline: true }
+                        { name: 'Hari', value: currentDayName, inline: false },
+                        { name: 'Jam', value: `${currentHour}:00`, inline: false },
+                        { name: 'User Terdaftar', value: userCount.toString(), inline: false }
                     )
                 
                 // Add task info if any

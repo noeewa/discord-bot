@@ -14,7 +14,7 @@ function insertServer(namaServer, serverId, channelId = null) {
 function updateServerChannel(serverId, channelId) {
     const db = openDB()
     db.prepare(
-        `UPDATE server SET channelId = ? WHERE serverId = ?`
+        `UPDATE server SET channelId = ? WHERE id = ?`
     ).run([channelId, serverId])
     console.log('Server channel updated successfully')
 }
@@ -23,9 +23,18 @@ function updateServerChannel(serverId, channelId) {
 function updateServerBroadcastChannel(serverId, broadcastChannelId) {
     const db = openDB()
     db.prepare(
-        `UPDATE server SET broadcastChannelId = ? WHERE serverId = ?`
+        `UPDATE server SET broadcastChannelId = ? WHERE id = ?`
     ).run([broadcastChannelId, serverId])
     console.log('Server broadcast channel updated successfully')
+}
+
+// Update server music channel
+function updateServerMusicChannel(serverId, musicChannelId) {
+    const db = openDB()
+    db.prepare(
+        `UPDATE server SET musicChannelId = ? WHERE id = ?`
+    ).run([musicChannelId, serverId])
+    console.log('Server music channel updated successfully')
 }
 
 // User functions
@@ -92,5 +101,6 @@ module.exports = {
     insertListTask,
     insertTask,
     updateServerChannel,
-    updateServerBroadcastChannel
+    updateServerBroadcastChannel,
+    updateServerMusicChannel
 }
