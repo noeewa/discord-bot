@@ -96,6 +96,14 @@ const commands = [
     new SlashCommandBuilder()
         .setName('userstats')
         .setDescription('Tampilkan jumlah user terdaftar')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gjoin')
+        .setDescription('Join voice channel')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gleft')
+        .setDescription('Leave voice channel')
         .toJSON()
 
 ]

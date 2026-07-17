@@ -15,9 +15,13 @@ const { handleCreateTaskModal } = require('./interaction/createtask.js')
 const { handleAskCommand, handleSearchCommand } = require('./interaction/ask.js')
 const { handleClearCommand, handleClearYouCommand, handleShowAllCommand, handleDeleteListCommand, handleDeleteTaskCommand } = require('./interaction/message.js')
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ModalActionRowComponentBuilder, EmbedBuilder, StringSelectMenuBuilder, ChannelType } = require('discord.js')
+const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice')
 
 // Store temporary data for multi-step interactions
 const interactionData = new Map();
+
+// Store voice connections per guild
+const voiceConnections = new Map();
 
 // Define slash commands (kept for reference, actual registration in register-command.js)
 const client = new Client({
@@ -1257,6 +1261,64 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: '❌ Gagal membuat task. Silakan coba lagi.', ephemeral: true })
         }
         return
+    }
+
+    if (interaction.commandName === 'gjoin') {
+        try {
+            const voiceChannel = interaction.member.voice.channel
+            if (!voiceChannel) {
+                await interaction.reply({ content: '❌ Anda harus berada di voice channel untuk menggunakan perintah ini.', ephemeral: true })
+                return
+            }
+
+            const guildId = interaction.guildId
+            const existingConnection = voiceConnections.get(guildId)
+            if (existingConnection) {
+                await interaction.reply({ content: '❌ Bot sudah terhubung ke voice channel di server ini.', ephemeral: true })
+                return
+            }
+
+            const connection = joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: guildId,
+                adapterCreator: interaction.guild.voiceAdapterCreator,
+            })
+
+            voiceConnections.set(guildId, connection)
+
+            connection.on(VoiceConnectionStatus.Disconnected, () => {
+                voiceConnections.delete(guildId)
+            })
+
+            connection.on(VoiceConnectionStatus.Destroyed, () => {
+                voiceConnections.delete(guildId)
+            })
+
+            await interaction.reply({ content: `✅ Bot bergabung ke voice channel: **${voiceChannel.name}**` })
+            console.log(`🔊 Bot joined voice channel: ${voiceChannel.name} in guild: ${interaction.guild.name}`)
+        } catch (error) {
+            console.error('Error joining voice channel:', error)
+            await interaction.reply({ content: '❌ Gagal join ke voice channel. Silakan coba lagi.', ephemeral: true })
+        }
+    } else if (interaction.commandName === 'gleft') {
+        try {
+            const guildId = interaction.guildId
+            const connection = voiceConnections.get(guildId)
+
+            if (!connection) {
+                await interaction.reply({ content: '❌ Bot tidak sedang terhubung ke voice channel di server ini.', ephemeral: true })
+                return
+            }
+
+            connection.destroy()
+            voiceConnections.delete(guildId)
+
+            await interaction.reply({ content: '✅ Bot meninggalkan voice channel.' })
+            console.log(`🔊 Bot left voice channel in guild: ${interaction.guild.name}`)
+        } catch (error) {
+            console.error('Error leaving voice channel:', error)
+            await interaction.reply({ content: '❌ Gagal meninggalkan voice channel. Silakan coba lagi.', ephemeral: true })
+        }
     }
 })
 
