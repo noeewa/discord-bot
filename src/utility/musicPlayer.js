@@ -74,7 +74,11 @@ async function playTrack(guildId, track, textChannel) {
         
         queue.isPlaying = true
         
-        queue.audioPlayer.once(AudioPlayerStatus.Idle, async () => {
+        queue.audioPlayer.on(AudioPlayerStatus.Idle, async () => {
+            if (queue.current !== track) {
+                return
+            }
+            
             if (queue.loop === 'single' && queue.current) {
                 await playTrack(guildId, queue.current, textChannel)
                 return
@@ -155,6 +159,11 @@ async function addToQueue(guildId, tracks, interactionOrChannel) {
 async function handleGplay(context, url) {
     try {
         const isInteraction = typeof context.deferReply === 'function'
+        
+        if (isInteraction) {
+            await context.deferReply()
+        }
+        
         const reply = async (content, options) => {
             if (isInteraction) {
                 if (typeof content === 'string') {
@@ -210,13 +219,18 @@ async function handleGplay(context, url) {
         
         let videos = []
         
-        if (playlistUrl.includes('list=')) {
-            const playlistInfo = await play.playlist_info(playlistUrl)
-            const allVideos = await playlistInfo.all_videos()
-            videos = allVideos.slice(0, 50)
-        } else {
-            const videoInfo = await play.video_info(playlistUrl)
-            videos = [videoInfo.video_details]
+        try {
+            if (playlistUrl.includes('list=')) {
+                const playlistInfo = await play.playlist_info(playlistUrl)
+                videos = await playlistInfo.next(50)
+            } else {
+                const videoInfo = await play.video_info(playlistUrl)
+                videos = [videoInfo.video_details]
+            }
+        } catch (playError) {
+            console.error('Error fetching playlist/video info:', playError)
+            await reply(`❌ Gagal memuat playlist: ${playError.message || 'Unknown error'}`)
+            return
         }
         
         if (videos.length === 0) {
@@ -249,9 +263,17 @@ async function handleGplay(context, url) {
         console.error('Error in handleGplay:', error)
         const isInteraction = typeof context.editReply === 'function'
         if (isInteraction) {
-            await context.editReply(`❌ Gagal memuat playlist: ${error.message}`)
+            try {
+                await context.editReply(`❌ Gagal memuat playlist: ${error.message || 'Unknown error'}`)
+            } catch (replyError) {
+                console.error('Error sending error reply:', replyError)
+            }
         } else {
-            await context.channel.send(`❌ Gagal memuat playlist: ${error.message}`)
+            try {
+                await context.channel.send(`❌ Gagal memuat playlist: ${error.message || 'Unknown error'}`)
+            } catch (replyError) {
+                console.error('Error sending error message:', replyError)
+            }
         }
     }
 }
