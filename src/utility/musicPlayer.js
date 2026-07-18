@@ -1,5 +1,6 @@
 const { joinVoiceChannel, VoiceConnectionStatus, getVoiceConnection, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, VolumeTransformer } = require('@discordjs/voice')
-const play = require('play-dl')
+const ytdl = require('@distube/ytdl-core')
+const ytpl = require('ytpl')
 const { EmbedBuilder } = require('discord.js')
 
 const queues = new Map()
@@ -14,11 +15,7 @@ function getQueue(guildId) {
             volume: 80,
             loop: 'off', // off, single, queue
             textChannel: null,
-            isPlaying: false,
-            playlistInfo: null,
-            playlistUrl: null,
-            playlistPage: 0,
-            isLoadingMore: false
+            isPlaying: false
         })
     }
     return queues.get(guildId)
@@ -61,9 +58,9 @@ async function playTrack(guildId, track, textChannel) {
     queue.current = track
     
     try {
-        const streamInfo = await play.stream(track.url)
-        const resource = createAudioResource(streamInfo.stream, {
-            inputType: streamInfo.type,
+        const stream = await ytdl(track.url)
+        const resource = createAudioResource(stream, {
+            inputType: StreamType.Arbitrary,
             inlineVolume: true
         })
         
@@ -130,57 +127,8 @@ async function playNext(guildId, textChannel) {
         return
     }
     
-    if (queue.tracks.length < 5 && queue.playlistInfo && !queue.isLoadingMore) {
-        await loadMoreFromPlaylist(guildId, textChannel)
-    }
-    
     const nextTrack = queue.tracks.shift()
     await playTrack(guildId, nextTrack, textChannel)
-}
-
-async function loadMoreFromPlaylist(guildId, textChannel) {
-    const queue = getQueue(guildId)
-    
-    if (!queue.playlistInfo || queue.isLoadingMore) {
-        return
-    }
-    
-    queue.isLoadingMore = true
-    
-    try {
-        queue.playlistPage++
-        const moreVideos = await queue.playlistInfo.next(50)
-        
-        if (moreVideos.length > 0) {
-            const tracks = moreVideos.map(video => ({
-                title: video.title || 'Unknown Title',
-                url: video.url,
-                duration: video.durationRaw || 'Unknown',
-                thumbnail: video.thumbnails?.[0]?.url || video.thumbnails?.[video.thumbnails.length - 1]?.url || '',
-                channel: video.channel?.name || video.channel?.id || 'Unknown',
-                stream: null
-            }))
-            
-            queue.tracks.push(...tracks)
-            
-            if (textChannel) {
-                await textChannel.send(`📥 Memuat batch berikutnya: **${tracks.length}** lagu ditambahkan ke queue.`)
-            }
-        } else {
-            queue.playlistInfo = null
-            if (textChannel) {
-                await textChannel.send('✅ Semua lagu dari playlist telah dimuat.')
-            }
-        }
-    } catch (error) {
-        console.error('Error loading more from playlist:', error)
-        queue.playlistInfo = null
-        if (textChannel) {
-            await textChannel.send('⚠️ Gagal memuat batch berikutnya. Playlist mungkin sudah habis.')
-        }
-    } finally {
-        queue.isLoadingMore = false
-    }
 }
 
 async function addToQueue(guildId, tracks, interactionOrChannel) {
@@ -271,28 +219,32 @@ async function handleGplay(context, url) {
         queue.textChannel = context.channel
         
         let videos = []
-        let playlistInfo = null
         
         try {
             if (playlistUrl.includes('list=')) {
-                playlistInfo = await play.playlist_info(playlistUrl)
-                videos = await playlistInfo.next(50)
+                const playlistInfo = await ytpl(playlistUrl)
+                videos = playlistInfo.items.map(item => ({
+                    title: item.title || 'Unknown Title',
+                    url: item.url,
+                    duration: item.duration || 'Unknown',
+                    thumbnail: item.thumbnails?.[0]?.url || item.thumbnails?.[item.thumbnails.length - 1]?.url || '',
+                    channel: item.author?.name || item.channel?.name || 'Unknown',
+                    stream: null
+                }))
             } else {
-                const videoInfo = await play.video_info(playlistUrl)
-                videos = [videoInfo.video_details]
+                videos = [{
+                    title: 'Unknown Title',
+                    url: playlistUrl,
+                    duration: 'Unknown',
+                    thumbnail: '',
+                    channel: 'Unknown',
+                    stream: null
+                }]
             }
         } catch (playError) {
-            const errorMessage = playError.message || ''
-            const isUnavailableVideosWarning = errorMessage.includes('unavailable videos are hidden')
-
-            if (isUnavailableVideosWarning) {
-                console.warn('Playlist warning:', errorMessage)
-                await reply('⚠️ Beberapa video di playlist ini tidak tersedia. Playlist tetap akan diputar dengan sisa video yang bisa diakses.')
-            } else {
-                console.error('Error fetching playlist/video info:', playError)
-                await reply(`❌ Gagal memuat playlist: ${errorMessage || 'Unknown error'}`)
-                return
-            }
+            console.error('Error fetching playlist/video info:', playError)
+            await reply(`❌ Gagal memuat playlist: ${playError.message || 'Unknown error'}`)
+            return
         }
         
         if (videos.length === 0) {
@@ -300,18 +252,12 @@ async function handleGplay(context, url) {
             return
         }
         
-        if (playlistInfo) {
-            queue.playlistInfo = playlistInfo
-            queue.playlistUrl = playlistUrl
-            queue.playlistPage = 1
-        }
-        
         const tracks = videos.map(video => ({
             title: video.title || 'Unknown Title',
             url: video.url,
-            duration: video.durationRaw || 'Unknown',
-            thumbnail: video.thumbnails?.[0]?.url || video.thumbnails?.[video.thumbnails.length - 1]?.url || '',
-            channel: video.channel?.name || video.channel?.id || 'Unknown',
+            duration: video.duration || 'Unknown',
+            thumbnail: video.thumbnail || '',
+            channel: video.channel || 'Unknown',
             stream: null
         }))
         
