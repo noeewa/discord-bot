@@ -49,6 +49,10 @@ client.on('ready', async (c) => {
             await registerCommandsToGuild(server.serverId)
             console.log(`✅ Commands registered to server: ${server.serverId}`)
         } catch (error) {
+            if (error.code === 50001) {
+                console.warn(`⚠️ Skipping server ${server.serverId}: bot tidak memiliki akses (mungkin sudah keluar/dikick).`)
+                continue
+            }
             console.error(`❌ Failed to register commands to server ${server.serverId}:`, error.message)
         }
     }

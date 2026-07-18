@@ -14,7 +14,11 @@ function getQueue(guildId) {
             volume: 80,
             loop: 'off', // off, single, queue
             textChannel: null,
-            isPlaying: false
+            isPlaying: false,
+            playlistInfo: null,
+            playlistUrl: null,
+            playlistPage: 0,
+            isLoadingMore: false
         })
     }
     return queues.get(guildId)
@@ -126,8 +130,57 @@ async function playNext(guildId, textChannel) {
         return
     }
     
+    if (queue.tracks.length < 5 && queue.playlistInfo && !queue.isLoadingMore) {
+        await loadMoreFromPlaylist(guildId, textChannel)
+    }
+    
     const nextTrack = queue.tracks.shift()
     await playTrack(guildId, nextTrack, textChannel)
+}
+
+async function loadMoreFromPlaylist(guildId, textChannel) {
+    const queue = getQueue(guildId)
+    
+    if (!queue.playlistInfo || queue.isLoadingMore) {
+        return
+    }
+    
+    queue.isLoadingMore = true
+    
+    try {
+        queue.playlistPage++
+        const moreVideos = await queue.playlistInfo.next(50)
+        
+        if (moreVideos.length > 0) {
+            const tracks = moreVideos.map(video => ({
+                title: video.title || 'Unknown Title',
+                url: video.url,
+                duration: video.durationRaw || 'Unknown',
+                thumbnail: video.thumbnails?.[0]?.url || video.thumbnails?.[video.thumbnails.length - 1]?.url || '',
+                channel: video.channel?.name || video.channel?.id || 'Unknown',
+                stream: null
+            }))
+            
+            queue.tracks.push(...tracks)
+            
+            if (textChannel) {
+                await textChannel.send(`📥 Memuat batch berikutnya: **${tracks.length}** lagu ditambahkan ke queue.`)
+            }
+        } else {
+            queue.playlistInfo = null
+            if (textChannel) {
+                await textChannel.send('✅ Semua lagu dari playlist telah dimuat.')
+            }
+        }
+    } catch (error) {
+        console.error('Error loading more from playlist:', error)
+        queue.playlistInfo = null
+        if (textChannel) {
+            await textChannel.send('⚠️ Gagal memuat batch berikutnya. Playlist mungkin sudah habis.')
+        }
+    } finally {
+        queue.isLoadingMore = false
+    }
 }
 
 async function addToQueue(guildId, tracks, interactionOrChannel) {
@@ -218,10 +271,11 @@ async function handleGplay(context, url) {
         queue.textChannel = context.channel
         
         let videos = []
+        let playlistInfo = null
         
         try {
             if (playlistUrl.includes('list=')) {
-                const playlistInfo = await play.playlist_info(playlistUrl)
+                playlistInfo = await play.playlist_info(playlistUrl)
                 videos = await playlistInfo.next(50)
             } else {
                 const videoInfo = await play.video_info(playlistUrl)
@@ -233,7 +287,7 @@ async function handleGplay(context, url) {
 
             if (isUnavailableVideosWarning) {
                 console.warn('Playlist warning:', errorMessage)
-                await reply('⚠️ Beberapa video di playlist ini tidak tersedia, tetapi playlist tetap akan diputar.')
+                await reply('⚠️ Beberapa video di playlist ini tidak tersedia. Playlist tetap akan diputar dengan sisa video yang bisa diakses.')
             } else {
                 console.error('Error fetching playlist/video info:', playError)
                 await reply(`❌ Gagal memuat playlist: ${errorMessage || 'Unknown error'}`)
@@ -244,6 +298,12 @@ async function handleGplay(context, url) {
         if (videos.length === 0) {
             await reply('❌ Playlist kosong atau semua video tidak tersedia. Pastikan playlist berisi video yang bisa diakses (jika private, playlist juga mungkin hidden).')
             return
+        }
+        
+        if (playlistInfo) {
+            queue.playlistInfo = playlistInfo
+            queue.playlistUrl = playlistUrl
+            queue.playlistPage = 1
         }
         
         const tracks = videos.map(video => ({
