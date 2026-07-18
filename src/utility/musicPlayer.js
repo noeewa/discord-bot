@@ -433,11 +433,32 @@ async function handleGstop(interaction) {
     
     if (queue.voiceConnection) {
         queue.voiceConnection.destroy()
+        queue.voiceConnection = null
     }
     
     queues.delete(guildId)
     
     await interaction.reply('⏹️ Musik dihentikan dan bot meninggalkan voice channel.')
+}
+
+function resetQueueState(guildId) {
+    const queue = getQueue(guildId)
+    queue.tracks = []
+    queue.current = null
+    queue.isPlaying = false
+    queue.loop = 'off'
+    queue.textChannel = null
+    if (queue.audioPlayer) {
+        queue.audioPlayer.stop()
+    }
+    if (queue.voiceConnection) {
+        try {
+            queue.voiceConnection.destroy()
+        } catch (e) {
+            // ignore
+        }
+        queue.voiceConnection = null
+    }
 }
 
 module.exports = {
@@ -453,5 +474,6 @@ module.exports = {
     handleGloop,
     handleGstop,
     getQueue,
-    queues
+    queues,
+    resetQueueState
 }

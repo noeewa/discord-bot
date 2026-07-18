@@ -1276,12 +1276,15 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             const guildId = interaction.guildId
-            const queue = require('./utility/musicPlayer.js').getQueue(guildId)
+            const { getQueue, resetQueueState } = require('./utility/musicPlayer.js')
+            const queue = getQueue(guildId)
             
             if (queue.voiceConnection) {
                 await interaction.reply({ content: '❌ Bot sudah terhubung ke voice channel di server ini.', ephemeral: true })
                 return
             }
+
+            resetQueueState(guildId)
 
             const connection = joinVoiceChannel({
                 channelId: voiceChannel.id,
@@ -1308,15 +1311,15 @@ client.on('interactionCreate', async (interaction) => {
     } else if (interaction.commandName === 'gleft') {
         try {
             const guildId = interaction.guildId
-            const queue = require('./utility/musicPlayer.js').getQueue(guildId)
+            const { getQueue, resetQueueState } = require('./utility/musicPlayer.js')
+            const queue = getQueue(guildId)
 
             if (!queue.voiceConnection) {
                 await interaction.reply({ content: '❌ Bot tidak sedang terhubung ke voice channel di server ini.', ephemeral: true })
                 return
             }
 
-            queue.voiceConnection.destroy()
-            queue.voiceConnection = null
+            resetQueueState(guildId)
 
             await interaction.reply({ content: '✅ Bot meninggalkan voice channel.' })
             console.log(`🔊 Bot left voice channel in guild: ${interaction.guild.name}`)
