@@ -242,7 +242,7 @@ async function handleGplay(context, url) {
         }
         
         if (videos.length === 0) {
-            await reply('❌ Tidak dapat menemukan video di playlist tersebut.')
+            await reply('❌ Playlist kosong atau semua video tidak tersedia. Pastikan playlist berisi video yang bisa diakses (jika private, playlist juga mungkin hidden).')
             return
         }
         
