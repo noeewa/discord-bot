@@ -228,9 +228,17 @@ async function handleGplay(context, url) {
                 videos = [videoInfo.video_details]
             }
         } catch (playError) {
-            console.error('Error fetching playlist/video info:', playError)
-            await reply(`❌ Gagal memuat playlist: ${playError.message || 'Unknown error'}`)
-            return
+            const errorMessage = playError.message || ''
+            const isUnavailableVideosWarning = errorMessage.includes('unavailable videos are hidden')
+
+            if (isUnavailableVideosWarning) {
+                console.warn('Playlist warning:', errorMessage)
+                await reply('⚠️ Beberapa video di playlist ini tidak tersedia, tetapi playlist tetap akan diputar.')
+            } else {
+                console.error('Error fetching playlist/video info:', playError)
+                await reply(`❌ Gagal memuat playlist: ${errorMessage || 'Unknown error'}`)
+                return
+            }
         }
         
         if (videos.length === 0) {
