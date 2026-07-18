@@ -16,6 +16,7 @@ const { handleAskCommand, handleSearchCommand } = require('./interaction/ask.js'
 const { handleClearCommand, handleClearYouCommand, handleShowAllCommand, handleDeleteListCommand, handleDeleteTaskCommand } = require('./interaction/message.js')
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ModalActionRowComponentBuilder, EmbedBuilder, StringSelectMenuBuilder, ChannelType } = require('discord.js')
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice')
+const { handleGplay, handleGpause, handleGresume, handleGskip, handleGnext, handleGqueue, handleGnowplaying, handleGvolume, handleGclear, handleGloop, handleGstop, handleGremove, handleGseek } = require('./utility/musicPlayer.js')
 
 // Store temporary data for multi-step interactions
 const interactionData = new Map();
@@ -126,34 +127,37 @@ client.on('messageCreate', async (message) => {
     
     // Check if message is in a music channel - only allow links
     if (server && server.musicChannelId && message.channelId === server.musicChannelId) {
-        // Check if message contains a URL/link
         const urlRegex = /(https?:\/\/[^\s]+)/g
-        const hasLink = urlRegex.test(message.content)
+        const urlMatch = message.content.match(urlRegex)
+        const hasLink = urlMatch && urlMatch.length > 0
         
-        // Delete message if it doesn't contain a link
         if (!hasLink) {
             try {
-                // Get the broadcast channel to send warning
                 const guild = message.guild
                 const broadcastChannel = server.broadcastChannelId ? await guild.channels.fetch(server.broadcastChannelId) : null
                 
-                // Send warning to broadcast channel with user tag
                 if (broadcastChannel) {
                     await broadcastChannel.send(`${message.author}, ⚠️ chanel khusus link!!`)
                 }
                 
-                // Delete original message after 1 second delay
                 setTimeout(async () => {
                     try {
                         await message.delete()
                         console.log(`🗑️ Deleted non-link message in music channel: "${message.content}"`)
                     } catch (delError) {
-                        // Message may have already been deleted
                     }
                 }, 1000)
             } catch (error) {
                 console.error('Error handling music channel message:', error)
             }
+            return
+        }
+        
+        const url = urlMatch[0]
+        try {
+            await require('./utility/musicPlayer.js').handleGplay(message, url)
+        } catch (error) {
+            console.error('Error auto-playing from music channel:', error)
         }
         return
     }
@@ -1272,8 +1276,9 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             const guildId = interaction.guildId
-            const existingConnection = voiceConnections.get(guildId)
-            if (existingConnection) {
+            const queue = require('./utility/musicPlayer.js').getQueue(guildId)
+            
+            if (queue.voiceConnection) {
                 await interaction.reply({ content: '❌ Bot sudah terhubung ke voice channel di server ini.', ephemeral: true })
                 return
             }
@@ -1284,14 +1289,14 @@ client.on('interactionCreate', async (interaction) => {
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             })
 
-            voiceConnections.set(guildId, connection)
-
+            queue.voiceConnection = connection
+            
             connection.on(VoiceConnectionStatus.Disconnected, () => {
-                voiceConnections.delete(guildId)
+                queue.voiceConnection = null
             })
 
             connection.on(VoiceConnectionStatus.Destroyed, () => {
-                voiceConnections.delete(guildId)
+                queue.voiceConnection = null
             })
 
             await interaction.reply({ content: `✅ Bot bergabung ke voice channel: **${voiceChannel.name}**` })
@@ -1303,15 +1308,15 @@ client.on('interactionCreate', async (interaction) => {
     } else if (interaction.commandName === 'gleft') {
         try {
             const guildId = interaction.guildId
-            const connection = voiceConnections.get(guildId)
+            const queue = require('./utility/musicPlayer.js').getQueue(guildId)
 
-            if (!connection) {
+            if (!queue.voiceConnection) {
                 await interaction.reply({ content: '❌ Bot tidak sedang terhubung ke voice channel di server ini.', ephemeral: true })
                 return
             }
 
-            connection.destroy()
-            voiceConnections.delete(guildId)
+            queue.voiceConnection.destroy()
+            queue.voiceConnection = null
 
             await interaction.reply({ content: '✅ Bot meninggalkan voice channel.' })
             console.log(`🔊 Bot left voice channel in guild: ${interaction.guild.name}`)
@@ -1319,6 +1324,35 @@ client.on('interactionCreate', async (interaction) => {
             console.error('Error leaving voice channel:', error)
             await interaction.reply({ content: '❌ Gagal meninggalkan voice channel. Silakan coba lagi.', ephemeral: true })
         }
+    } else if (interaction.commandName === 'gplay') {
+        const url = interaction.options.getString('url')
+        await handleGplay(interaction, url)
+    } else if (interaction.commandName === 'gpause') {
+        await handleGpause(interaction)
+    } else if (interaction.commandName === 'gresume') {
+        await handleGresume(interaction)
+    } else if (interaction.commandName === 'gskip' || interaction.commandName === 'gnext') {
+        await handleGskip(interaction)
+    } else if (interaction.commandName === 'gqueue') {
+        await handleGqueue(interaction)
+    } else if (interaction.commandName === 'gnowplaying') {
+        await handleGnowplaying(interaction)
+    } else if (interaction.commandName === 'gvolume') {
+        const volume = interaction.options.getInteger('volume')
+        await handleGvolume(interaction, volume)
+    } else if (interaction.commandName === 'gshuffle') {
+        await interaction.reply('🔀 Fitur shuffle belum diimplementasikan.')
+    } else if (interaction.commandName === 'gclear') {
+        await handleGclear(interaction)
+    } else if (interaction.commandName === 'gloop') {
+        const mode = interaction.options.getString('mode') || 'off'
+        await handleGloop(interaction, mode)
+    } else if (interaction.commandName === 'gremove') {
+        await interaction.reply('❌ Fitur remove belum diimplementasikan.')
+    } else if (interaction.commandName === 'gseek') {
+        await interaction.reply('❌ Fitur seek belum diimplementasikan.')
+    } else if (interaction.commandName === 'gstop') {
+        await handleGstop(interaction)
     }
 })
 

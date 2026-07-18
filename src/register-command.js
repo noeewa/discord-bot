@@ -104,6 +104,95 @@ const commands = [
     new SlashCommandBuilder()
         .setName('gleft')
         .setDescription('Leave voice channel')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gplay')
+        .setDescription('Putar playlist YouTube Music dari URL')
+        .addStringOption(option =>
+            option.setName('url')
+                .setDescription('URL playlist YouTube Music')
+                .setRequired(true)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gpause')
+        .setDescription('Jeda lagu yang sedang diputar')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gresume')
+        .setDescription('Lanjutkan lagu yang dijeda')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gskip')
+        .setDescription('Skip lagu saat ini ke lagu berikutnya')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gnext')
+        .setDescription('Skip lagu saat ini ke lagu berikutnya')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gqueue')
+        .setDescription('Tampilkan daftar antrian lagu')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gnowplaying')
+        .setDescription('Tampilkan info lagu yang sedang diputar')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gvolume')
+        .setDescription('Atur volume (0-100)')
+        .addIntegerOption(option =>
+            option.setName('volume')
+                .setDescription('Volume (0-100)')
+                .setRequired(true)
+                .setMinValue(0)
+                .setMaxValue(100)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gshuffle')
+        .setDescription('Acak urutan queue')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gclear')
+        .setDescription('Hapus semua antrian')
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gloop')
+        .setDescription('Atur mode loop (off/single/queue)')
+        .addStringOption(option =>
+            option.setName('mode')
+                .setDescription('Mode loop')
+                .setRequired(false)
+                .addChoices(
+                    { name: 'Off', value: 'off' },
+                    { name: 'Single', value: 'single' },
+                    { name: 'Queue', value: 'queue' }
+                )
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gremove')
+        .setDescription('Hapus lagu tertentu dari queue')
+        .addIntegerOption(option =>
+            option.setName('position')
+                .setDescription('Posisi lagu yang akan dihapus')
+                .setRequired(true)
+                .setMinValue(1)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gseek')
+        .setDescription('Lompat ke posisi tertentu di lagu')
+        .addStringOption(option =>
+            option.setName('position')
+                .setDescription('Posisi (contoh: 1:30 atau 90)')
+                .setRequired(true)
+        )
+        .toJSON(),
+    new SlashCommandBuilder()
+        .setName('gstop')
+        .setDescription('Hentikan musik dan keluar dari voice channel')
         .toJSON()
 
 ]
